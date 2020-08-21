@@ -1,0 +1,50 @@
+#!/bin/bash -e
+
+# Determine my current dir (src: https://stackoverflow.com/a/246128/13519872).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
+# Load config.
+. $DIR/smartmontools-notifier.cfg
+
+error=$(cat $1)
+#echo "$error"
+#text=${error}
+
+retv=$(curl --silent -G --data-urlencode "chat_id=${chatid}" --data-urlencode "text=smartd ran me" https://api.telegram.org/bot${apikey}/sendMessage 2>&1 /dev/null)
+
+# Relevant parts
+#host=$(cat $1 | awk '/^\s+host name:\s+/{print $NF}')
+host=$(cat $1 | grep 'host name:' | cut -d ':' -f 2-99 | tr -d ' ')
+#echo "host: $host"
+#error_msg_full=$(echo $error | awk '/^Device:/' $1)
+error_msg_full=$(echo $error | grep 'The following warning/error was logged by the smartd daemon:' -A 2 | tail -n1)
+#echo "error_msg_full: $error_msg_full"
+#error_msg=$(echo $error | awk '/^Device:/' $1 | cut -d ',' -f 2-99 | cut -d ' ' -f 2-99)
+#error_msg=$(echo $error | grep 'The following warning/error was logged by the smartd daemon:' -A 2 | tail -n1)
+error_msg=$(cat $1 | grep 'The following warning/error was logged by the smartd daemon:' -A 2 | grep -v 'The following warning/error was logged by the smartd daemon:' | tr -d '\n')
+#echo "error_msg: $error_msg"
+device_info=$(cat $1 | grep -A 1 'Device info:' | grep -v 'Device info:')
+#echo "device_info: $device_info"
+device_id=$(echo $device_info | cut -d ',' -f 1)
+#echo "device_id: $device_id"
+device_sn=$(echo $device_info | cut -d ',' -f 2 | cut -d ':' -f 2-99)
+#echo "device_sn: $device_sn"
+device_fqdn=$(echo "${device_id}_${device_sn}")
+#echo "device_fqdn $device_fqdn"
+device_size=$(echo $device_info | rev | cut -d ',' -f 1 | rev | cut -d ' ' -f 2-99)
+#echo "device_size: $device_size"
+
+# Figure out the sdX.
+device_sdx=$(readlink -f /dev/disk/by-id/*$device_sn* | head -n1)
+#echo "device_sdx: $device_sdx"
+
+#text=$(echo -e "$host smartd: $device_sdx ($device_fqdn):\n\n$error_msg")
+text=$(echo -e "$host $device_sdx: $error_msg")
+
+retv=$(curl --silent -G --data-urlencode "chat_id=${chatid}" --data-urlencode "text=${text}" https://api.telegram.org/bot${apikey}/sendMessage 2>&1 /dev/null)
