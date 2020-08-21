@@ -15,10 +15,12 @@ DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 echo "DIR: $DIR | PWD: $(pwd) | 1: $1 | args: $@"
 
 #Debug
-mkdir -pv $DIR/debug_logs
-logfile=$DIR/debug_logs/$(date +"%Y-%m-%dT%H_%m_%s").log
-cp -vn $1 $logfile
-chown -v $chown_user $logfile
+if [ $debug ]; then
+    mkdir -pv $DIR/debug_logs
+    logfile=$DIR/debug_logs/$(date +"%Y-%m-%dT%H_%m_%s").log
+    cp -vn $1 $logfile
+    chown -v $chown_user $logfile
+fi
 
 # Function used to ensure variables get set. Avoids issues with script exiting in -e mode.
 eval_expr() {
